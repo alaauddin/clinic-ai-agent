@@ -12,7 +12,7 @@ class ClinicAIChat:
             model="gpt-4o-mini", 
             temperature=0,
             openai_api_key=settings.OPENAI_API_KEY,
-            request_timeout=120 # Increased timeout
+            request_timeout=150 # Increased timeout
         )
         self.vector_store = ClinicVectorStore()
         self.tools = [
