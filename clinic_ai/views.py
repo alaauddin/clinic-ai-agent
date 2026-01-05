@@ -5,7 +5,8 @@ from rest_framework import status, permissions, authentication
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth import authenticate, login, logout
 from .serializers import UserSerializer, AppointmentSerializer
-from .ai_engine.chains import get_ai_chat
+
+
 from .models import ChatLog
 from .context import current_user
 import logging
@@ -99,6 +100,7 @@ class ChatAPIView(APIView):
             # Set user context for tools
             token = current_user.set(user)
             try:
+                from .ai_engine.chains import get_ai_chat
                 ai_chat = get_ai_chat()
                 answer = ai_chat.ask(query, user=user, chat_history=chat_history)
             finally:
