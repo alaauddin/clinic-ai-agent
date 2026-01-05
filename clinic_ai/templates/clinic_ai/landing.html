@@ -1,0 +1,190 @@
+{% extends 'clinic_ai/base.html' %}
+{% load static %}
+
+{% block title %}عيادتي الذكية | ثورة في الرعاية الطبية{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-container {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        align-items: center;
+        padding: 120px 8% 60px;
+        gap: 60px;
+    }
+
+    .hero-visual {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        animation: floatImage 8s infinite ease-in-out;
+        will-change: transform;
+    }
+
+    .hero-visual img {
+        width: 100%;
+        max-width: 550px;
+        border-radius: 40px;
+        box-shadow: 0 30px 60px rgba(0,0,0,0.1);
+        border: 8px solid white;
+    }
+
+    .hero-visual::after {
+        content: '';
+        position: absolute;
+        inset: -20px;
+        border: 2px dashed rgba(99, 102, 241, 0.2);
+        border-radius: 50px;
+        z-index: -1;
+    }
+
+    @keyframes floatImage {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-20px); }
+    }
+
+    .hero-text { text-align: right; }
+
+    .hero-badge {
+        display: inline-block;
+        padding: 8px 16px;
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+        border-radius: 100px;
+        font-weight: 700;
+        font-size: 0.9em;
+        margin-bottom: 25px;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        animation: fadeInRight 0.8s ease-out;
+    }
+
+    .hero-title {
+        font-size: 4.5em;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 25px;
+        background: linear-gradient(135deg, #1e293b 0%, #6366f1 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: fadeInRight 1s ease-out 0.2s both;
+    }
+
+    .hero-desc {
+        font-size: 1.25em;
+        color: #64748b;
+        line-height: 1.7;
+        margin-bottom: 40px;
+        max-width: 600px;
+        animation: fadeInRight 1s ease-out 0.4s both;
+    }
+
+    .cta-group {
+        display: flex;
+        gap: 20px;
+        animation: fadeInRight 1s ease-out 0.6s both;
+    }
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 30px;
+        margin-top: 60px;
+    }
+
+    .feature-card {
+        background: white;
+        padding: 40px 30px;
+        border-radius: 32px;
+        border: 1px solid #f1f5f9;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-15px);
+        box-shadow: 0 40px 80px rgba(99, 102, 241, 0.1);
+        border-color: rgba(99, 102, 241, 0.2);
+    }
+
+    .feature-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        background: #f8fafc;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2em;
+        margin-bottom: 25px;
+        transition: var(--transition-smooth);
+    }
+
+    .feature-card:hover .feature-icon-wrapper {
+        background: #6366f1;
+        color: white;
+        transform: scale(1.1) rotate(5deg);
+    }
+
+    @media (max-width: 1100px) {
+        .hero-title { font-size: 3.5em; }
+        .hero-container { padding: 120px 5% 60px; gap: 40px; }
+    }
+
+    @media (max-width: 900px) {
+        .hero-container {
+            grid-template-columns: 1fr;
+            text-align: center;
+            padding-top: 140px;
+        }
+        .hero-text { text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .hero-desc { margin-left: auto; margin-right: auto; }
+        .hero-visual { order: -1; }
+        .features-grid { grid-template-columns: 1fr; }
+        .hero-title { font-size: 3em; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="hero-container">
+    <!-- Text Section (Right in RTL) -->
+    <div class="hero-text">
+        <div class="hero-badge">✨ مدعوم بالذكاء الاصطناعي التوليدي</div>
+        <h1 class="hero-title">مستقبل الرعاية الطبية بين يديك.</h1>
+        <p class="hero-desc">
+            انضم إلى آلاف المرضى الذين يثقون في "نور"، المساعد الطبي الذكي الذي يسهل حياتك. حجز مواعيد، تحليل بيانات، وتقارير طبية فورية بلمسة زر.
+        </p>
+        
+        <div class="cta-group">
+            <button class="premium-btn signup-btn" style="font-size: 1.2em; padding: 18px 45px;" onclick="showModal('signup-modal')">ابدأ مجانًا</button>
+            <button class="premium-btn login-btn" style="font-size: 1.2em; padding: 18px 45px; background: white; border: 2px solid #e2e8f0; color: #1e293b;" onclick="showModal('login-modal')">استكشاف المزايا</button>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon-wrapper">🤖</div>
+                <h3 style="font-weight: 700; margin-bottom: 12px;">مساعد ذكي 24/7</h3>
+                <p style="font-size: 0.95em; color: #64748b; line-height: 1.6;">نور متواجدة دائماً للإجابة على استفساراتك الطبية في أي وقت.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon-wrapper">📅</div>
+                <h3 style="font-weight: 700; margin-bottom: 12px;">حجز مواعيد فوري</h3>
+                <p style="font-size: 0.95em; color: #64748b; line-height: 1.6;">وفر ساعات من الانتظار، واحجز موعدك مع الطبيب المختص بدقة.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon-wrapper">📄</div>
+                <h3 style="font-weight: 700; margin-bottom: 12px;">تقارير احترافية</h3>
+                <p style="font-size: 0.95em; color: #64748b; line-height: 1.6;">احصل على بياناتك الطبية بصيغ PDF و Excel بتنسيق عالمي.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Section (Left in RTL) -->
+    <div class="hero-visual">
+        <img src="{% static 'clinic_ai/img/hero_visual.png' %}" alt="Medical AI Assistant">
+    </div>
+</main>
+{% endblock %}

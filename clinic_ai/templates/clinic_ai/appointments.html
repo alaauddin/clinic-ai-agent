@@ -1,0 +1,184 @@
+{% extends 'clinic_ai/base.html' %}
+{% load static %}
+
+{% block title %}مواعيدي | عيادتي الذكية{% endblock %}
+
+{% block extra_css %}
+<style>
+    .app-content {
+        padding: 120px 8% 120px;
+        max-width: 1000px; /* More focused for timeline */
+        margin: 0 auto;
+    }
+
+    /* Timeline Container */
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 40px;
+        height: 100%;
+        width: 4px;
+        background: #f1f5f9;
+        border-radius: 2px;
+    }
+
+    /* Timeline Item */
+    .timeline-item {
+        position: relative;
+        margin-bottom: 40px;
+        padding-right: 80px;
+        animation: fadeInRight 0.6s ease-out both;
+    }
+
+    .timeline-dot {
+        position: absolute;
+        right: 32px;
+        top: 20px;
+        width: 20px;
+        height: 20px;
+        background: white;
+        border: 4px solid #6366f1;
+        border-radius: 50%;
+        z-index: 10;
+        box-shadow: 0 0 0 8px #f8fafc;
+    }
+
+    .timeline-dot.confirmed { border-color: #10b981; }
+    .timeline-dot.pending { border-color: #f59e0b; }
+    .timeline-dot.cancelled { border-color: #ef4444; }
+
+    .appointment-card-v2 {
+        background: white;
+        border-radius: 28px;
+        padding: 30px;
+        border: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: var(--transition-smooth);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+    }
+
+    .appointment-card-v2:hover {
+        transform: translateX(-10px);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.08);
+        border-color: rgba(99, 102, 241, 0.2);
+    }
+
+    .doctor-meta {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .doc-mini-avatar {
+        width: 60px;
+        height: 60px;
+        background: #f8fafc;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6em;
+    }
+
+    .time-badge {
+        background: #f8fafc;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 0.95em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .action-group {
+        display: flex;
+        gap: 12px;
+    }
+
+    .status-pill {
+        padding: 6px 14px;
+        border-radius: 100px;
+        font-size: 0.85em;
+        font-weight: 700;
+    }
+
+    .pill-confirmed { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .pill-pending { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .pill-cancelled { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    @media (max-width: 768px) {
+        .timeline::before { right: 20px; }
+        .timeline-item { padding-right: 50px; }
+        .timeline-dot { right: 12px; }
+        .appointment-card-v2 { flex-direction: column; align-items: flex-start; gap: 20px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="app-content">
+    <div class="section-header" style="text-align: center; margin-bottom: 60px;">
+        <h1 class="section-title">مواعيدي القادمة 🗓️</h1>
+        <p class="section-subtitle">تنظيم جدولك الطبي لم يكن بهذه السهولة من قبل.</p>
+    </div>
+
+    <div class="timeline">
+        {% for appointment in appointments %}
+        <div class="timeline-item" style="animation-delay: {{ forloop.counter0|add:0.1 }}s;">
+            <div class="timeline-dot {{ appointment.status }}"></div>
+            <div class="appointment-card-v2">
+                <div class="doctor-meta">
+                    <div class="doc-mini-avatar">👨‍⚕️</div>
+                    <div>
+                        <h3 style="font-weight: 800; margin-bottom: 5px;">د. {{ appointment.doctor.name }}</h3>
+                        <p style="color: #64748b; font-size: 0.9em;">
+                            {{ appointment.doctor.specialty }} | {{ appointment.clinic.name }}
+                        </p>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 12px;">
+                    <div class="time-badge">
+                        🕒 {{ appointment.appointment_date|date:"Y-m-d | H:i" }}
+                    </div>
+                    <div class="action-group">
+                        <span class="status-pill pill-{{ appointment.status }}">
+                            {{ appointment.get_status_display }}
+                        </span>
+                        <button class="premium-btn login-btn" style="padding: 6px 12px; font-size: 0.8em; border: 1px solid #e2e8f0; background: transparent;">التفاصيل</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div style="text-align: center; padding: 80px 40px; background: white; border-radius: 40px; border: 2px dashed #e2e8f0; margin-right: 80px;">
+            <div style="font-size: 4em; margin-bottom: 25px;">📅</div>
+            <h2 style="font-weight: 800; color: #1e293b; margin-bottom: 10px;">لا يوجد مواعيد محجوزة</h2>
+            <p style="color: #64748b; margin-bottom: 30px; font-size: 1.1em;">ابدأ محادثة مع مساعدنا الذكي لحجز موعدك الأول في دقائق.</p>
+            <a href="/chat/" class="premium-btn signup-btn" style="text-decoration: none; padding: 18px 40px; display: inline-block; font-size: 1.1em;">احجز موعد الآن</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Feedback Banner -->
+    {% if appointments %}
+    <div style="margin-top: 60px; background: #eef2ff; border-radius: 30px; padding: 30px; display: flex; align-items: center; gap: 25px; border: 1px solid rgba(99, 102, 241, 0.1);">
+        <div style="font-size: 2.5em;">💡</div>
+        <div>
+            <h4 style="font-weight: 800; color: #1e293b; margin-bottom: 5px;">هل تعلم؟</h4>
+            <p style="color: #6366f1; font-size: 0.95em; font-weight: 600;">يمكنك إعادة جدولة أي موعد من خلال التحدث إلى "نور" في قسم المساعد الذكي.</p>
+        </div>
+    </div>
+    {% endif %}
+</main>
+{% endblock %}

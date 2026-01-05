@@ -1,0 +1,174 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}عيادتي الذكية{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'clinic_ai/css/chat.css' %}">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.4);
+        }
+        body {
+            background: #f8fafc;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+        .nav-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(248, 250, 252, 0.8);
+            box-shadow: 0 4px 30px rgba(0,0,0,0.03);
+        }
+        /* Common animations */
+        @keyframes fadeInRight {
+            from { opacity: 0; transform: translateX(15px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body style="{% block body_style %}overflow-y: auto;{% endblock %}">
+    {% block background %}
+    <!-- Default ambient background -->
+    <div class="bg-glow glow-1" style="position: fixed; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%); z-index: -1; filter: blur(80px); top: -200px; right: -200px;"></div>
+    <div class="bg-glow glow-2" style="position: fixed; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, transparent 70%); z-index: -1; filter: blur(80px); bottom: -200px; left: -200px;"></div>
+    {% endblock %}
+
+    {% block header %}
+    <nav class="nav-header">
+        <div style="font-weight: 800; font-size: 1.6em; color: var(--sidebar-bg); cursor: pointer;" onclick="window.location.href='/'">
+            🏥 عيادتي <span style="color:#6366f1;">الذكية</span>
+        </div>
+        <div class="auth-buttons">
+            {% if user.is_authenticated %}
+                <span style="margin-left: 15px; font-weight: 600; color: #64748b;">مرحباً، {{ user.username }}</span>
+                <button class="premium-btn login-btn" style="padding: 10px 20px; border: 1px solid #e2e8f0; background: white; color: #ef4444;" onclick="logoutUser()">خروج</button>
+            {% else %}
+                <button class="premium-btn login-btn" onclick="showModal('login-modal')">دخول</button>
+                <button class="premium-btn signup-btn" onclick="showModal('signup-modal')">اشترك مجاناً</button>
+            {% endif %}
+        </div>
+    </nav>
+    {% endblock %}
+
+    {% block content %}{% endblock %}
+
+    {% if user.is_authenticated %}
+    <!-- Global Persistent Navigation -->
+    <nav class="global-nav">
+        <a href="/dashboard/" class="nav-link {% if request.path == '/dashboard/' %}active{% endif %}">
+            <span class="nav-item-icon">🏠</span>
+            <span>الرئيسية</span>
+        </a>
+        <a href="/chat/" class="nav-link {% if request.path == '/chat/' %}active{% endif %}">
+            <span class="nav-item-icon">🤖</span>
+            <span>المساعد الذكي</span>
+        </a>
+        <a href="/appointments/" class="nav-link {% if request.path == '/appointments/' %}active{% endif %}">
+            <span class="nav-item-icon">📅</span>
+            <span>مواعيدي</span>
+        </a>
+    </nav>
+    {% endif %}
+
+    <!-- Modals -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <h2 style="font-weight: 800; margin-bottom: 25px; text-align: center;">عودة حميدة 👋</h2>
+            <input type="text" id="login-user" class="modal-input" placeholder="اسم المستخدم أو البريد" style="width: 100%; padding: 15px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; margin-bottom: 15px;">
+            <input type="password" id="login-pass" class="modal-input" placeholder="كلمة المرور" style="width: 100%; padding: 15px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; margin-bottom: 15px;">
+            <button class="premium-btn signup-btn" style="width: 100%; padding: 15px; font-size: 1.1em;" onclick="loginUser()">دخول إلى حسابك</button>
+            <button class="premium-btn login-btn" style="width: 100%; margin-top: 10px; background: transparent; color: #64748b; border: none;" onclick="hideModal('login-modal')">إلغاء</button>
+        </div>
+    </div>
+
+    <div id="signup-modal" class="modal">
+        <div class="modal-content">
+            <h2 style="font-weight: 800; margin-bottom: 25px; text-align: center;">انضـم إلينا 💙</h2>
+            <input type="text" id="signup-user" class="modal-input" placeholder="اسم المستخدم" style="width: 100%; padding: 15px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; margin-bottom: 15px;">
+            <input type="email" id="signup-email" class="modal-input" placeholder="البريد الإلكتروني" style="width: 100%; padding: 15px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; margin-bottom: 15px;">
+            <input type="password" id="signup-pass" class="modal-input" placeholder="كلمة المرور" style="width: 100%; padding: 15px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; margin-bottom: 15px;">
+            <button class="premium-btn signup-btn" style="width: 100%; padding: 15px; font-size: 1.1em;" onclick="signupUser()">إنشاء حساب جديد</button>
+            <button class="premium-btn login-btn" style="width: 100%; margin-top: 10px; background: transparent; color: #64748b; border: none;" onclick="hideModal('signup-modal')">إلغاء</button>
+        </div>
+    </div>
+
+    <script>
+        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        async function signupUser() {
+            const user = document.getElementById('signup-user').value;
+            const email = document.getElementById('signup-email').value;
+            const pass = document.getElementById('signup-pass').value;
+            
+            const res = await fetch('/api/signup/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ username: user, email: email, password: pass })
+            });
+            if (res.ok) {
+                alert('تم إنشاء الحساب بنجاح. يرجى تسجيل الدخول.');
+                hideModal('signup-modal');
+                showModal('login-modal');
+            } else {
+                const data = await res.json();
+                alert('خطأ: ' + JSON.stringify(data));
+            }
+        }
+
+        async function loginUser() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            
+            const res = await fetch('/api/login/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+            if (res.ok) {
+                window.location.href = "/dashboard/";
+            } else {
+                alert('خطأ في الدخول: تأكد من صحة البيانات');
+            }
+        }
+
+        async function logoutUser() {
+            const res = await fetch('/api/logout/', { 
+                method: 'POST', 
+                headers: { 'X-CSRFToken': getCookie('csrftoken') } 
+            });
+            window.location.href = "/";
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

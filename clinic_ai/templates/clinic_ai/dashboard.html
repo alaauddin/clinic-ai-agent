@@ -1,0 +1,263 @@
+{% extends 'clinic_ai/base.html' %}
+{% load static %}
+
+{% block title %}لوحة التحكم | عيادتي الذكية{% endblock %}
+
+{% block extra_css %}
+<style>
+    .app-content {
+        padding: 120px 8% 120px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Welcome Banner */
+    .welcome-banner {
+        background: var(--primary-gradient);
+        border-radius: 40px;
+        padding: 50px;
+        color: white;
+        margin-bottom: 50px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+    }
+
+    .welcome-banner::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+
+    .welcome-text h1 {
+        font-size: 2.8em;
+        font-weight: 800;
+        margin-bottom: 10px;
+    }
+
+    .welcome-text p {
+        font-size: 1.2em;
+        opacity: 0.9;
+    }
+
+    /* Stats Row */
+    .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 25px;
+        margin-bottom: 50px;
+    }
+
+    .stat-box {
+        background: white;
+        padding: 25px;
+        border-radius: 28px;
+        border: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        transition: var(--transition-smooth);
+    }
+
+    .stat-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.05);
+    }
+
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        background: #f8fafc;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8em;
+    }
+
+    /* Section Styling */
+    .hub-section {
+        margin-bottom: 60px;
+    }
+
+    .section-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    /* Doctor Special Card */
+    .doctor-card {
+        background: white;
+        border-radius: 30px;
+        padding: 30px;
+        border: 1px solid #f1f5f9;
+        transition: var(--transition-smooth);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .doctor-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 30px 60px rgba(99, 102, 241, 0.12);
+        border-color: rgba(99, 102, 241, 0.2);
+    }
+
+    .doctor-header {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+    }
+
+    .doctor-avatar {
+        width: 80px;
+        height: 80px;
+        background: #eef2ff;
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.2em;
+    }
+
+    .doctor-info h3 {
+        font-size: 1.4em;
+        font-weight: 800;
+        margin-bottom: 5px;
+        color: #1e293b;
+    }
+
+    .specialty-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+        border-radius: 100px;
+        font-size: 0.85em;
+        font-weight: 700;
+    }
+
+    .clinic-location {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #94a3b8;
+        font-size: 0.9em;
+    }
+
+    .book-btn {
+        margin-top: 10px;
+        width: 100%;
+        text-align: center;
+        text-decoration: none;
+        padding: 15px;
+        border-radius: 16px;
+        font-weight: 700;
+        transition: var(--transition-smooth);
+    }
+
+    @media (max-width: 900px) {
+        .welcome-banner { padding: 40px; text-align: center; justify-content: center; }
+        .hero-stats { grid-template-columns: 1fr; }
+        .welcome-text h1 { font-size: 2.2em; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="app-content">
+    <!-- Welcome Section -->
+    <div class="welcome-banner">
+        <div class="welcome-text">
+            <h1>مرحباً، {{ user.username }} 👋</h1>
+            <p>كيف يمكننا خدمتك في المركز الطبي اليوم؟</p>
+        </div>
+        <div style="font-size: 5em; opacity: 0.8;" class="hide-mobile">🏥</div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="hero-stats">
+        <div class="stat-box">
+            <div class="stat-icon" style="color: #6366f1;">👨‍⚕️</div>
+            <div>
+                <div style="font-size: 1.4em; font-weight: 800;">+25</div>
+                <div style="color: #64748b; font-size: 0.9em;">طبيب مختص</div>
+            </div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-icon" style="color: #10b981;">🏢</div>
+            <div>
+                <div style="font-size: 1.4em; font-weight: 800;">+10</div>
+                <div style="color: #64748b; font-size: 0.9em;">عيادات متكاملة</div>
+            </div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-icon" style="color: #f59e0b;">🌟</div>
+            <div>
+                <div style="font-size: 1.4em; font-weight: 800;">4.9</div>
+                <div style="color: #64748b; font-size: 0.9em;">تقييم المستخدمين</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clinics Section -->
+    <section class="hub-section">
+        <div class="section-header-flex">
+            <h2 style="font-weight: 800; color: #1e293b; margin: 0;">العيادات المتاحة</h2>
+            <a href="#" style="color: #6366f1; font-weight: 700; text-decoration: none; font-size: 0.95em;">عرض الكل ←</a>
+        </div>
+        <div class="grid-container">
+            {% for clinic in clinics %}
+            <div class="premium-card">
+                <div class="card-tag">📍 {{ clinic.location }}</div>
+                <div class="card-avatar" style="background: #f8fafc; color: #6366f1;">🏢</div>
+                <h3 style="font-weight: 800; font-size: 1.35em; margin-bottom: 10px;">{{ clinic.name }}</h3>
+                <p style="color: #64748b; font-size: 0.95em; line-height: 1.6; margin-bottom: 20px;">
+                    {{ clinic.description|default:"نقدم أفضل الخدمات الطبية المتكاملة بأحدث الأجهزة والتقنيات العالمية." }}
+                </p>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid #f1f5f9;">
+                    <span style="font-size: 0.85em; font-weight: 700; color: #10b981;">● متاح الآن</span>
+                    <button class="premium-btn login-btn" style="padding: 8px 16px; font-size: 0.85em;">التفاصيل</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Doctors Section -->
+    <section class="hub-section">
+        <div class="section-header-flex">
+            <h2 style="font-weight: 800; color: #1e293b; margin: 0;">نخبة الأطباء</h2>
+            <a href="#" style="color: #6366f1; font-weight: 700; text-decoration: none; font-size: 0.95em;">البحث عن طبيب ←</a>
+        </div>
+        <div class="grid-container">
+            {% for doctor in doctors %}
+            <div class="doctor-card">
+                <div class="doctor-header">
+                    <div class="doctor-avatar">👨‍⚕️</div>
+                    <div class="doctor-info">
+                        <h3>د. {{ doctor.name }}</h3>
+                        <span class="specialty-badge">{{ doctor.specialty }}</span>
+                    </div>
+                </div>
+                <div class="clinic-location">
+                    <span>🏢 {{ doctor.clinic.name }}</span>
+                </div>
+                <p style="color: #64748b; font-size: 0.9em; line-height: 1.5;">متخصص في علاج الحالات المتقدمة بخبرة تزيد عن 10 سنوات.</p>
+                <a href="/chat/" class="premium-btn signup-btn book-btn">حجز موعد فوري</a>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+{% endblock %}

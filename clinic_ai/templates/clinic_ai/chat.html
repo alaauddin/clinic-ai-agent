@@ -1,0 +1,233 @@
+{% extends 'clinic_ai/base.html' %}
+{% load static %}
+
+{% block title %}مساعد العيادة الذكي - حوار متميز{% endblock %}
+
+{% block body_style %}display: flex; height: 100vh; overflow: hidden;{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Specific adjustments for chat integration */
+    .main-layout {
+        height: 100vh;
+        overflow: hidden;
+    }
+    .chat-wrapper {
+        padding-bottom: 100px; /* Space for global nav */
+    }
+    header.chat-top-bar {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<!-- Chat Sidebar Logic -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div class="sidebar" id="sidebar">
+    <div class="logo-area" style="padding: 10px 0 20px; font-weight: 800; font-size: 1.2em;">
+        🏥 عيادتي <span style="color: #6366f1;">الذكية</span>
+    </div>
+    <button class="new-chat-btn" onclick="startNewChat()">
+        <span>+ محادثة جديدة</span>
+    </button>
+    <h3>سجل المحادثات</h3>
+    <div id="history-list" class="history-list">
+        <!-- History items will be loaded here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<main class="main-layout" style="flex: 1; display: flex; flex-direction: column;">
+    <!-- Top Bar inside main-layout to follow original chat logic -->
+    <header class="chat-top-bar">
+        <button class="menu-toggle" onclick="toggleSidebar()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="logo-text">الذكاء الطبي الإصطناعي</div>
+        <div class="auth-buttons">
+            <span style="font-size: 0.9em; margin-left: 15px; font-weight: 600; color: #64748b;">مرحباً، <b>{{ request.user.username }}</b></span>
+            <button class="premium-btn login-btn" style="padding: 8px 18px; border: 1px solid #e2e8f0; background: white; color: #ef4444;" onclick="logoutUser()">خروج</button>
+        </div>
+    </header>
+
+    <div class="chat-wrapper">
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="status-indicator"></div>
+                <div style="font-weight: 700; font-size: 1.1em;">نور - المساعد الذكي</div>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message ai-message">أهلاً بك! أنا "نور"، مساعدتك الذكية. كيف يمكنني خدمتك اليوم؟ ✨</div>
+            </div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="user-input" placeholder="اطلب حجز موعد، أو استفسر عن تخصص...">
+                <button id="send-btn" onclick="sendMessage()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentSessionId = localStorage.getItem('chat_session_id') || crypto.randomUUID();
+    localStorage.setItem('chat_session_id', currentSessionId);
+
+    async function startNewChat() {
+        currentSessionId = crypto.randomUUID();
+        localStorage.setItem('chat_session_id', currentSessionId);
+        document.getElementById('chat-messages').innerHTML = `
+            <div class="message ai-message">بدأنا محادثة جديدة! كيف يمكنني مساعدتك اليوم؟</div>
+        `;
+        fetchHistory();
+    }
+
+    async function fetchHistory() {
+        try {
+            const res = await fetch('/api/history/');
+            if (!res.ok) return;
+            const sessions = await res.json();
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = `history-item ${s.session_id === currentSessionId ? 'active' : ''}`;
+                div.textContent = s.title || 'محادثة بلا عنوان';
+                div.onclick = () => {
+                    loadSession(s.session_id);
+                    if(window.innerWidth <= 768) toggleSidebar();
+                };
+                list.appendChild(div);
+            });
+        } catch (e) {
+            console.error("Failed to fetch history", e);
+        }
+    }
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    }
+
+    async function loadSession(sessionId) {
+        currentSessionId = sessionId;
+        localStorage.setItem('chat_session_id', currentSessionId);
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.innerHTML = '<div class="message ai-message">جاري تحميل المحادثة...</div>';
+        
+        try {
+            const res = await fetch(`/api/history/${sessionId}/`);
+            const messages = await res.json();
+            messagesDiv.innerHTML = '';
+            messages.forEach(m => {
+                renderMessage(m.type === 'human' ? 'user-message' : 'ai-message', m.text);
+            });
+            fetchHistory();
+        } catch (e) {
+            messagesDiv.innerHTML = '<div class="message ai-message">فشل في تحميل المحادثة.</div>';
+        }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('user-input');
+        const messages = document.getElementById('chat-messages');
+        const btn = document.getElementById('send-btn');
+        const query = input.value.trim();
+        if (!query) return;
+
+        input.disabled = btn.disabled = true;
+        messages.innerHTML += `<div class="message user-message">${query}</div>`;
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'message ai-message';
+        aiMsg.innerHTML = `
+            <div class="typing-container">
+                <span class="processing-text">جاري المعالجة</span>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        `;
+        messages.appendChild(aiMsg);
+        messages.scrollTop = messages.scrollHeight;
+        input.value = '';
+
+        try {
+            const res = await fetch('/api/chat/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ query: query, session_id: currentSessionId })
+            });
+            if (!res.ok) {
+                aiMsg.textContent = `خطأ في الخادم (${res.status})`;
+                return;
+            }
+            const data = await res.json();
+            aiMsg.innerHTML = formatAIResponse(data.answer);
+            fetchHistory();
+        } catch (e) {
+            aiMsg.textContent = 'حدث خطأ في الاتصال.';
+        } finally {
+            input.disabled = btn.disabled = false;
+            messages.scrollTop = messages.scrollHeight;
+            input.focus();
+        }
+    }
+
+    function renderMessage(className, text) {
+        const messagesDiv = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'message ' + className;
+        div.innerHTML = className.includes('ai-message') ? formatAIResponse(text) : text;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function formatAIResponse(text) {
+        const excelRegex = /\[?(?:تقرير|ملف|تحميل|)(?:رابط التحميل: )?(https?:\/\/[^\s]+?\.xlsx|\/media\/[^\s]+?\.xlsx)\]?/g;
+        const pdfRegex = /\[?(?:تقرير|ملف|تحميل|)(?:رابط التحميل: )?(https?:\/\/[^\s]+?\.pdf|\/media\/[^\s]+?\.pdf)\]?/g;
+        let html = text.replace(excelRegex, (match, url) => {
+            const filename = url.split('/').pop();
+            return `
+                <a href="${url}" class="download-card" download>
+                    <div class="card-icon excel-theme">XL</div>
+                    <div class="card-content">
+                        <div class="card-title">تقرير بيانات (Excel)</div>
+                        <div class="card-meta">${filename}</div>
+                    </div>
+                    <div style="font-weight: bold; color: #10b981; font-size: 0.8em;">تحميل</div>
+                </a>
+            `;
+        });
+        html = html.replace(pdfRegex, (match, url) => {
+            const filename = url.split('/').pop();
+            return `
+                <a href="${url}" class="download-card" download target="_blank">
+                    <div class="card-icon pdf-theme">PDF</div>
+                    <div class="card-content">
+                        <div class="card-title">تقرير طبي (PDF)</div>
+                        <div class="card-meta">${filename}</div>
+                    </div>
+                    <div style="font-weight: bold; color: #ef4444; font-size: 0.8em;">تحميل</div>
+                </a>
+            `;
+        });
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        return html;
+    }
+
+    window.onload = () => { fetchHistory(); };
+    document.getElementById('user-input').addEventListener('keypress', e => { if(e.key === 'Enter') sendMessage(); });
+</script>
+{% endblock %}

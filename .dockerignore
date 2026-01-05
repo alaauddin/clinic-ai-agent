@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.db.sqlite3
+.git/
+.env
+faiss_index/
+clinic_docs/
+brain/
+requirements.txt
+Dockerfile
+docker-compose.yml
