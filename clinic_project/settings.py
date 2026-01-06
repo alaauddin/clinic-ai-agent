@@ -156,6 +156,10 @@ REST_FRAMEWORK = {
     ],
 }
 
+# Email Settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'no-reply@smart-clinic.com'
+
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

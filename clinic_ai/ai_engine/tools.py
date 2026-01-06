@@ -45,7 +45,7 @@ def list_all_doctors(query: str):
     استرجاع قائمة بجميع الأطباء في المركز الطبي مع تخصصاتهم وعياداتهم.
     استخدم هذه الأداة عندما يطلب المستخدم تقريراً أو قائمة عامة لجميع الأطباء.
     """
-    docs = Doctor.objects.select_related('clinic').all()
+    docs = Doctor.objects.all().select_related('clinic')
     if not docs.exists():
         return "لا يوجد أطباء مسجلون حالياً."
     
@@ -137,91 +137,136 @@ def get_clinic_general_info(query: str):
     return f"ساعات العمل: {info.working_hours}\nالموقع: {info.location}\nالهاتف: {info.phone}"
 
 @tool
+def get_available_doctors_by_date(date_str: str):
+    """
+    استرجاع قائمة بالأطباء المتاحين في تاريخ معين، مع عرض الأوقات المتاحة لكل طبيب.
+    المدخل: التاريخ بصيغة 'YYYY-MM-DD'.
+    """
+    try:
+        from datetime import datetime, time, timedelta
+        from django.utils import timezone
+        search_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        day_val = search_date.weekday()
+        
+        # Get all availabilities for this day of week
+        availabilities = DoctorAvailability.objects.filter(day_of_week=day_val).select_related('doctor')
+        
+        if not availabilities.exists():
+            return f"لا يوجد أطباء متاحون في هذا التاريخ ({date_str})."
+        
+        # Get existing appointments for this date
+        booked_appointments = Appointment.objects.filter(
+            appointment_date__date=search_date,
+            status__in=['pending', 'confirmed']
+        ).values_list('doctor_id', 'appointment_date')
+        
+        # Group booked times by doctor (handle awareness)
+        booked_map = {}
+        for doc_id, appt_time in booked_appointments:
+            if doc_id not in booked_map:
+                booked_map[doc_id] = []
+            # Ensure we compare times in the same context (UTC since settings.TIME_ZONE='UTC')
+            booked_map[doc_id].append(appt_time.time())
+
+        results = []
+        for avail in availabilities:
+            doctor = avail.doctor
+            slots = []
+            curr_time = datetime.combine(search_date, avail.start_time)
+            end_datetime = datetime.combine(search_date, avail.end_time)
+            
+            while curr_time < end_datetime:
+                slot_time = curr_time.time()
+                # Check for EXACT match or overlap if needed, but here we assume fixed 30m slots
+                is_booked = any(b_time == slot_time for b_time in booked_map.get(doctor.id, []))
+                
+                if not is_booked:
+                    # Return 24h format for better AI parsing, maybe with emoji
+                    slots.append(slot_time.strftime('%H:%M'))
+                
+                curr_time += timedelta(minutes=30)
+
+            if slots:
+                results.append(f"الطبيب: {doctor.name} ({doctor.specialty})\nالأوقات المتاحة: {', '.join(slots)}")
+        
+        if not results:
+            return f"جميع المواعيد محجوزة في هذا التاريخ ({date_str})."
+        
+        return "\n\n".join(results)
+    except Exception as e:
+        return f"حدث خطأ أثناء البحث عن المواعيد المتاحة: {str(e)}"
+
+@tool
 def book_appointment(appointment_info: str):
     """
     حجز موعد جديد للمريض. 
-    المدخل يجب أن يكون سلسلة نصية تحتوي على: 'اسم العيادة، اسم الطبيب، التاريخ والوقت YYYY-MM-DD HH:MM'.
-    مثال: 'عيادة الأسنان، د. سارة محمد، 2026-05-20 14:00'.
-    ملاحظة هامة: لا تقرر بنفسك إذا كان الموظف متاحاً أم لا؛ اطلب الموعد دائماً ودع النظام يتحقق من الجدول. 4 مساءً هي 16:00 وهي موعد صالح دائماً إذا كان الطبيب متاحاً حتى 6 مساءً.
-    تحذير: تأكد من أن الموعد في المستقبل وضمن ساعات العمل (9 ص - 9 م).
+    **🚨 متطلب إلزامي جداً 🚨**: يجب طلب جميع بيانات المريض (الاسم، تاريخ الميلاد YYYY-MM-DD، الهاتف، البريد) **في كل جلسة دردشة جديدة**. 
+    لا تعتمد أبداً على بيانات من سجلات سابقة؛ اطلبها من المستخدم مباشرة في كل مرة يطلب فيها حجزاً جديداً.
+    المدخل يجب أن يكون: 'اسم العيادة، اسم الطبيب، التاريخ والوقت YYYY-MM-DD HH:MM، اسم المريض، تاريخ الميلاد، الهاتف، البريد'.
     """
     user = current_user.get()
     if user is None or not user.is_authenticated:
-        return "يجب عليك تسجيل الدخول أولاً لحجز موعد. يرجى استخدام أزرار الدخول في الأعلى."
+        return "يجب عليك تسجيل الدخول أولاً لحجز موعد."
     
     try:
-        parts = [p.strip() for p in appointment_info.replace('،', ',').split(',')]
-        if len(parts) < 3:
-            return "يرجى تقديم اسم العيادة، اسم الطبيب، والموعد (YYYY-MM-DD HH:MM)."
-        
-        cl_name, doc_name, date_str = parts[0], parts[1], parts[2]
-        
-        clinic = Clinic.objects.filter(name__icontains=cl_name).first()
-        if not clinic:
-            # Try keyword search for clinic
-            words = cl_name.split()
-            q_cl = Q()
-            for w in words:
-                cw = w[2:] if w.startswith('ال') and len(w) > 3 else w
-                q_cl &= Q(name__icontains=cw)
-            clinic = Clinic.objects.filter(q_cl).first()
-            if not clinic:
-                return f"لم يتم العثور على عيادة باسم '{cl_name}'."
-
-        # Flexible doctor search
-        words_doc = doc_name.split()
-        q_doc = Q(clinic=clinic)
-        for w in words_doc:
-            cw = w[2:] if w.startswith('ال') and len(w) > 3 else w
-            q_doc &= Q(name__icontains=cw)
-        doctor = Doctor.objects.filter(q_doc).first()
-        if not doctor:
-            return f"لم يتم العثور على طبيب باسم '{doc_name}' في {clinic.name}."
-        
+        from django.utils import timezone
         from datetime import datetime
-        appt_date = datetime.strptime(date_str, '%Y-%m-%d %H:%M')
+        parts = [p.strip() for p in appointment_info.replace('،', ',').split(',')]
+        if len(parts) < 7:
+            return "بيانات ناقصة. المطلوب: (العيادة، الطبيب، الموعد YYYY-MM-DD HH:MM، الاسم، تاريخ الميلاد، الهاتف، البريد)."
         
-        # 1. Check if date is in the future
-        if appt_date <= datetime.now():
-            return "عذراً، يجب أن يكون الموعد في المستقبل. لا يمكن حجز مواعيد سابقة."
-            
-        # 2. Check if within working hours (9 AM - 9 PM)
-        if appt_date.hour < 9 or appt_date.hour >= 21:
-            return "عذراً، المواعيد المتاحة فقط من 9 صباحاً حتى 9 مساءً."
+        cl_name, doc_name, date_str, p_name, p_dob_str, p_phone, p_email = parts[:7]
 
-        # 3. Check doctor availability schedule
-        # day_of_week in python is 0=Mon to 6=Sun, same as our choices
+        clinic = Clinic.objects.filter(name__icontains=cl_name).first()
+        if not clinic: return f"العيادة '{cl_name}' غير موجودة."
+
+        doctor = Doctor.objects.filter(clinic=clinic, name__icontains=doc_name).first()
+        if not doctor: return f"الطبيب '{doc_name}' غير موجود في هذه العيادة."
+        
+        try:
+            appt_date_naive = datetime.strptime(date_str, '%Y-%m-%d %H:%M')
+            # Make it aware based on settings (UTC)
+            appt_date = timezone.make_aware(appt_date_naive, timezone.get_current_timezone())
+        except Exception:
+            return "تنسيق التاريخ والوقت غير صحيح. استخدم YYYY-MM-DD HH:MM."
+
+        if appt_date <= timezone.now():
+            return "الموعد يجب أن يكون في المستقبل."
+
+        # Check availability
         day_val = appt_date.weekday()
         time_val = appt_date.time()
-        
-        available_slots = DoctorAvailability.objects.filter(
-            doctor=doctor, 
-            day_of_week=day_val,
-            start_time__lte=time_val,
-            end_time__gte=time_val
-        )
-        
-        if not available_slots.exists():
-            days_ar = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
-            day_name_ar = days_ar[day_val]
-            
-            all_slots = DoctorAvailability.objects.filter(doctor=doctor, day_of_week=day_val)
-            if all_slots.exists():
-                slots_str = " | ".join([f"{s.start_time.strftime('%I:%M %p')} - {s.end_time.strftime('%I:%M %p')}" for s in all_slots])
-                return f"عذراً، {doctor.name} غير متاح في هذا الوقت. المواعيد المتاحة في يوم {day_name_ar} هي: {slots_str}."
-            else:
-                return f"عذراً، {doctor.name} لا يعمل في يوم {day_name_ar}. يرجى اختيار يوم آخر."
+        if not DoctorAvailability.objects.filter(doctor=doctor, day_of_week=day_val, start_time__lte=time_val, end_time__gt=time_val).exists():
+            return "الطبيب غير متاح في هذا الوقت بناءً على جدوله الأسبوعي."
+
+        # Check if already booked
+        if Appointment.objects.filter(doctor=doctor, appointment_date=appt_date, status__in=['pending', 'confirmed']).exists():
+            return f"عذراً، الموعد {date_str} محجوز بالفعل للطبيب {doctor.name}. يرجى اختيار وقت آخر."
+
+        # Create
+        try:
+            p_dob = datetime.strptime(p_dob_str, '%Y-%m-%d').date()
+        except:
+            return "تنسيق تاريخ الميلاد غير صحيح (YYYY-MM-DD)."
 
         appointment = Appointment.objects.create(
-            user=user,
-            clinic=clinic,
-            doctor=doctor,
-            appointment_date=appt_date
+            user=user, clinic=clinic, doctor=doctor, appointment_date=appt_date,
+            patient_name=p_name, patient_dob=p_dob, patient_phone=p_phone, patient_email=p_email
         )
         
-        return f"تم حجز الموعد بنجاح في {clinic.name}! رقم الموعد: {appointment.id}. الموعد: {appt_date.strftime('%Y-%m-%d %H:%M')} مع {doctor.name}."
+        # Notifications (Send silently or check settings)
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            subject = f"تأكيد حجز - {clinic.name}"
+            msg = f"تم الحجز بنجاح!\nالطبيب: {doctor.name}\nالموعد: {date_str}\nالاسم: {p_name}\nرقم الحجز: {appointment.id}"
+            send_mail(subject, msg, settings.DEFAULT_FROM_EMAIL, [p_email])
+        except:
+            pass
+
+        return f"تهانينا! تم حجز موعدك بنجاح. رقم الحجز الخاص بك هو {appointment.id}. تم إرسال رسالة تأكيد إلكترونية إلى {p_email}."
     except Exception as e:
-        return f"حدث خطأ أثناء حجز الموعد: {str(e)}"
+        return f"خطأ تقني: {str(e)}"
 
 @tool
 def list_user_appointments(query: str):

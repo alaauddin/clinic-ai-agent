@@ -47,10 +47,18 @@ class Appointment(models.Model):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
     appointment_date = models.DateTimeField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # New Fields
+    patient_name = models.CharField(max_length=150, blank=True)
+    patient_dob = models.DateField(null=True, blank=True)
+    patient_phone = models.CharField(max_length=20, blank=True)
+    patient_email = models.EmailField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} at {self.clinic.name if self.clinic else 'N/A'} - {self.doctor.name} on {self.appointment_date}"
+        name = self.patient_name if self.patient_name else self.user.username
+        return f"{name} at {self.clinic.name if self.clinic else 'N/A'} - {self.doctor.name} on {self.appointment_date}"
 
 class ClinicInfo(models.Model):
     # This might become redundant or serve as "Center Information"
