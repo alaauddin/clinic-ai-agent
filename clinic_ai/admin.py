@@ -15,7 +15,19 @@ class DoctorAdmin(admin.ModelAdmin):
 
 admin.site.register(ClinicInfo)
 admin.site.register(ChatLog)
-admin.site.register(Appointment)
+@admin.register(Appointment)
+class AppointmentAdmin(admin.ModelAdmin):
+    list_display = ('patient_name', 'user', 'doctor', 'appointment_date', 'status')
+    list_filter = ('status', 'appointment_date', 'doctor')
+    search_fields = ('patient_name', 'patient_phone', 'patient_email', 'user__username')
+    fieldsets = (
+        ('Patient Information', {
+            'fields': ('patient_name', 'patient_dob', 'patient_phone', 'patient_email')
+        }),
+        ('Appointment Details', {
+            'fields': ('user', 'clinic', 'doctor', 'appointment_date', 'status')
+        }),
+    )
 
 @admin.register(DoctorAvailability)
 class DoctorAvailabilityAdmin(admin.ModelAdmin):
