@@ -32,9 +32,13 @@ def dashboard_view(request):
     from .models import Clinic, Doctor
     clinics = Clinic.objects.all()
     doctors = Doctor.objects.all().select_related('clinic')
+    clinic_count = clinics.count()
+    doctor_count = doctors.count()
     return render(request, 'clinic_ai/dashboard.html', {
         'clinics': clinics,
-        'doctors': doctors
+        'doctors': doctors,
+        'clinic_count': clinic_count,
+        'doctor_count': doctor_count
     })
 
 @login_required(login_url='/')

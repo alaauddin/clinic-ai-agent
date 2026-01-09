@@ -34,13 +34,27 @@ def fix_arabic(text):
     return bidi_text
 
 @tool
-def list_clinics(query: str):
-    """List all available clinics in the medical center."""
-    clinics = Clinic.objects.all()
-    return "\n".join([f"العيادة: {c.name}, الموقع: {c.location}" for c in clinics])
+def list_clinics(query: str = ""):
+    """
+    List all available clinics and their doctors in the medical center.
+    STRICT RULE: Only return clinics found in the database. Never hallucinate or add fictional clinics.
+    """
+    clinics = Clinic.objects.all().prefetch_related('doctors')
+    if not clinics.exists():
+        return "لا توجد عيادات مسجلة حالياً."
+    
+    table = "| # | العيادة | الموقع | الأطباء |\n"
+    table += "| :--- | :--- | :--- | :--- |\n"
+    
+    for i, c in enumerate(clinics):
+        doctors = c.doctors.all()
+        doc_list = "<br>".join([f"• {d.name} ({d.specialty})" for d in doctors]) if doctors.exists() else "لا يوجد أطباء حالياً"
+        table += f"| {i+1} | {c.name} | {c.location} | {doc_list} |\n"
+    
+    return table
 
 @tool
-def list_all_doctors(query: str):
+def list_all_doctors(query: str = ""):
     """
     استرجاع قائمة بجميع الأطباء في المركز الطبي مع تخصصاتهم وعياداتهم.
     استخدم هذه الأداة عندما يطلب المستخدم تقريراً أو قائمة عامة لجميع الأطباء.
@@ -62,73 +76,72 @@ def list_all_doctors(query: str):
 @tool
 def get_doctor_availability(doctor_info: str):
     """
-    البحث عن توافر الأطباء في المركز. 
-    يمكنك البحث باستخدام: اسم الطبيب (مثلاً: 'د. أحمد')، أو التخصص (مثلاً: 'جلدية')، أو اسم العيادة (مثلاً: 'عيادة الأسنان').
-    نصيحة: إذا لم تجد طبيباً، استخدم list_clinics أولاً لمعرفة أسماء العيادات الصحيحة.
+    Search for doctor availability. 
+    You can search by: name (e.g., 'Dr. Ahmed'), specialty (e.g., 'Dermatology'), or clinic name.
     """
     parts = [p.strip() for p in doctor_info.replace('،', ',').split(',')]
     query = parts[0]
     clinic_name = parts[1] if len(parts) > 1 else None
 
-    def search_with_keywords(model, search_query, extra_filter=None):
-        words = search_query.split()
-        q_obj = Q()
-        for word in words:
-            clean_word = word[2:] if word.startswith('ال') and len(word) > 3 else word
-            # Handle specialty/name/clinic name in one go for doctors
-            if model == Doctor:
-                q_obj &= (Q(name__icontains=clean_word) | Q(specialty__icontains=clean_word) | Q(clinic__name__icontains=clean_word))
-            else:
-                q_obj &= Q(name__icontains=clean_word)
-        
-        results = model.objects.filter(q_obj)
-        if extra_filter:
-            results = results.filter(extra_filter)
-        return results
-
-    doctors = search_with_keywords(Doctor, query)
+    # Search Logic
+    words = query.split()
+    q_obj = Q()
+    for word in words:
+        clean_word = word[2:] if word.startswith('ال') and len(word) > 3 else word
+        q_obj &= (Q(name__icontains=clean_word) | Q(specialty__icontains=clean_word) | Q(clinic__name__icontains=clean_word))
+    
+    doctors = Doctor.objects.filter(q_obj).select_related('clinic')
     if clinic_name:
         doctors = doctors.filter(clinic__name__icontains=clinic_name)
 
     if not doctors.exists():
         return "لا يوجد أطباء بهذا الوصف حالياً."
     
-    results = []
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    table_rows = []
+
     for doc in doctors:
-        clinic_str = f"في {doc.clinic.name}" if doc.clinic else ""
-        avail_list = doc.availabilities.all()
-        if avail_list.exists():
-            from datetime import timedelta
-            now = datetime.now()
-            days_ar = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
-            sched_parts = []
-            for a in avail_list:
-                day_name = days_ar[a.day_of_week]
-                # Calculate next 2 dates for this day_of_week
-                upcoming_dates = []
-                days_ahead = a.day_of_week - now.weekday()
-                if days_ahead < 0:
-                    days_ahead += 7
+        availabilities = doc.availabilities.all()
+        for i in range(7):
+            check_date = (now + timedelta(days=i)).date()
+            day_val = check_date.weekday()
+            
+            day_slots = []
+            for avail in availabilities.filter(day_of_week=day_val):
+                curr_dt = datetime.combine(check_date, avail.start_time)
+                end_dt = datetime.combine(check_date, avail.end_time)
                 
-                # Next occurrence
-                next_date = now + timedelta(days=days_ahead)
-                upcoming_dates.append(next_date.strftime('%Y-%m-%d'))
-                # Occurrence after that
-                second_date = next_date + timedelta(days=7)
-                upcoming_dates.append(second_date.strftime('%Y-%m-%d'))
-                
-                dates_str = " (" + ", ".join(upcoming_dates) + ")"
-                sched_parts.append(f"{day_name}: {a.start_time.strftime('%I:%M %p (%H:%M)')} - {a.end_time.strftime('%I:%M %p (%H:%M)')}{dates_str}")
-            sched_str = " | ".join(sched_parts)
-        else:
-            sched_str = "لا توجد مواعيد محددة حالياً"
-        
-        results.append(f"الطبيب: {doc.name}, التخصص: {doc.specialty}, {clinic_str}, الجدول: {sched_str}")
+                while curr_dt < end_dt:
+                    slot_start = curr_dt
+                    # Exact 30-min window check
+                    is_booked = Appointment.objects.filter(
+                        doctor=doc,
+                        appointment_date__range=(slot_start - timedelta(seconds=1799), slot_start + timedelta(seconds=1799)),
+                        status__in=['pending', 'confirmed']
+                    ).exists()
+                    
+                    if not is_booked and curr_dt > now:
+                        day_slots.append(curr_dt.strftime('%H:%M'))
+                    curr_dt += timedelta(minutes=30)
+            
+            if day_slots:
+                days_ar = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+                day_name = days_ar[day_val]
+                clinic_label = f" ({doc.clinic.name})" if doc.clinic else ""
+                table_rows.append(f"| {day_name} | {check_date} | {doc.name}{clinic_label} | {', '.join(day_slots)} |")
+
+    if not table_rows:
+        return "عذراً، لا توجد مواعيد متاحة لهؤلاء الأطباء في الأيام القادمة."
+
+    table = "| اليوم | التاريخ | الطبيب (العيادة) | الأوقات المتاحة |\n"
+    table += "| :--- | :--- | :--- | :--- |\n"
+    table += "\n".join(table_rows)
     
-    return "\n".join(results)
+    return table
 
 @tool
-def get_clinic_general_info(query: str):
+def get_clinic_general_info(query: str = ""):
     """Get general clinic information like working hours, location, and phone."""
     info = ClinicInfo.objects.first()
     if not info:
@@ -154,7 +167,7 @@ def get_available_doctors_by_date(date_str: str):
         if not availabilities.exists():
             return f"لا يوجد أطباء متاحون في هذا التاريخ ({date_str})."
         
-        # Get existing appointments for this date
+        # Get existing appointments for this date to check for overlaps
         booked_appointments = Appointment.objects.filter(
             appointment_date__date=search_date,
             status__in=['pending', 'confirmed']
@@ -177,8 +190,13 @@ def get_available_doctors_by_date(date_str: str):
             
             while curr_time < end_datetime:
                 slot_time = curr_time.time()
-                # Check for EXACT match or overlap if needed, but here we assume fixed 30m slots
-                is_booked = any(b_time == slot_time for b_time in booked_map.get(doctor.id, []))
+                # Overlap logic: A slot at 'slot_time' is blocked if any appointment exists that starts
+                # within 29 minutes and 59 seconds before or after this time (the '30-minute rule').
+                # This ensures back-to-back appointments (e.g., 10:00 and 10:30) are allowed, but anything else is blocked.
+                is_booked = any(
+                    abs((datetime.combine(search_date, slot_time) - appt_dt.replace(tzinfo=None)).total_seconds()) < 1800 
+                    for d_id, appt_dt in booked_appointments if d_id == doctor.id
+                )
                 
                 if not is_booked:
                     # Return 24h format for better AI parsing, maybe with emoji
@@ -187,7 +205,7 @@ def get_available_doctors_by_date(date_str: str):
                 curr_time += timedelta(minutes=30)
 
             if slots:
-                results.append(f"الطبيب: {doctor.name} ({doctor.specialty})\nالأوقات المتاحة: {', '.join(slots)}")
+                results.append(f"{len(results)+1}. الطبيب: {doctor.name} ({doctor.specialty})\n   الأوقات المتاحة: {', '.join(slots)}")
         
         if not results:
             return f"جميع المواعيد محجوزة في هذا التاريخ ({date_str})."
@@ -195,6 +213,71 @@ def get_available_doctors_by_date(date_str: str):
         return "\n\n".join(results)
     except Exception as e:
         return f"حدث خطأ أثناء البحث عن المواعيد المتاحة: {str(e)}"
+
+@tool
+def get_upcoming_availability_for_clinic(clinic_name: str):
+    """
+    استرجاع كافة المواعيد المتاحة (الغير محجوزة) لجميع الأطباء في عيادة معينة للأيام السبعة القادمة.
+    استخدم هذه الأداة فور اختيار المستخدم للعيادة لتعرض له الخيارات المتاحة مباشرة.
+    """
+    try:
+        from datetime import datetime, time, timedelta
+        from django.utils import timezone
+        
+        clinic = Clinic.objects.filter(name__icontains=clinic_name).first()
+        if not clinic:
+            return f"العيادة '{clinic_name}' غير موجودة."
+        
+        doctors = clinic.doctors.all()
+        if not doctors.exists():
+            return f"لا يوجد أطباء مسجلون في عيادة {clinic.name} حالياً."
+        
+        now = datetime.now()
+        table_rows = []
+        
+        for doctor in doctors:
+            availabilities = doctor.availabilities.all()
+            for i in range(7):
+                check_date = (now + timedelta(days=i)).date()
+                day_val = check_date.weekday()
+                
+                day_slots = []
+                for avail in availabilities.filter(day_of_week=day_val):
+                    curr_time = datetime.combine(check_date, avail.start_time)
+                    end_datetime = datetime.combine(check_date, avail.end_time)
+                    
+                    while curr_time < end_datetime:
+                        slot_time = curr_time.time()
+                        # Range check for 30-minute overlap.
+                        # We use 29.9 minutes to allow exact back-to-back bookings while catching any internal overlaps.
+                        from datetime import timedelta
+                        slot_start = datetime.combine(check_date, slot_time)
+                        is_booked = Appointment.objects.filter(
+                            doctor=doctor,
+                            appointment_date__range=(slot_start - timedelta(seconds=1799), slot_start + timedelta(seconds=1799)),
+                            status__in=['pending', 'confirmed']
+                        ).exists()
+                        
+                        is_future = datetime.combine(check_date, slot_time) > now
+                        if not is_booked and is_future:
+                            day_slots.append(slot_time.strftime('%H:%M'))
+                        curr_time += timedelta(minutes=30)
+                
+                if day_slots:
+                    days_ar = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+                    day_name = days_ar[day_val]
+                    table_rows.append(f"| {day_name} | {check_date} | {doctor.name} | {', '.join(day_slots)} |")
+        
+        if not table_rows:
+            return f"عذراً، لا توجد مواعيد متاحة في عيادة {clinic.name} خلال الـ 7 أيام القادمة."
+        
+        table = "| اليوم | التاريخ | الطبيب | الأوقات المتاحة |\n"
+        table += "| :--- | :--- | :--- | :--- |\n"
+        table += "\n".join(table_rows)
+        
+        return table
+    except Exception as e:
+        return f"خطأ في جلب المواعيد: {str(e)}"
 
 @tool
 def book_appointment(appointment_info: str):
@@ -239,9 +322,14 @@ def book_appointment(appointment_info: str):
         if not DoctorAvailability.objects.filter(doctor=doctor, day_of_week=day_val, start_time__lte=time_val, end_time__gt=time_val).exists():
             return "الطبيب غير متاح في هذا الوقت بناءً على جدوله الأسبوعي."
 
-        # Check if already booked
-        if Appointment.objects.filter(doctor=doctor, appointment_date=appt_date, status__in=['pending', 'confirmed']).exists():
-            return f"عذراً، الموعد {date_str} محجوز بالفعل للطبيب {doctor.name}. يرجى اختيار وقت آخر."
+        # Collision Protection (30-Minute Window)
+        from datetime import timedelta
+        # Ensure no other appointment overlaps with this 30-minute block
+        # Buffer of 29 minutes and 59 seconds ensures back-to-back slots are allowed
+        start_search = appt_date - timedelta(seconds=1799)
+        end_search = appt_date + timedelta(seconds=1799)
+        if Appointment.objects.filter(doctor=doctor, appointment_date__range=(start_search, end_search), status__in=['pending', 'confirmed']).exists():
+            return f"عذراً، هذا الموعد {date_str} متداخل مع موعد آخر (مدة الموعد 30 دقيقة). يرجى اختيار وقت آخر."
 
         # Create
         try:
@@ -269,7 +357,7 @@ def book_appointment(appointment_info: str):
         return f"خطأ تقني: {str(e)}"
 
 @tool
-def list_user_appointments(query: str):
+def list_user_appointments(query: str = ""):
     """List appointments for the current user."""
     user = current_user.get()
     if user is None or not user.is_authenticated:

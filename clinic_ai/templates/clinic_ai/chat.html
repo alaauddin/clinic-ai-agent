@@ -195,36 +195,61 @@
     }
 
     function formatAIResponse(text) {
+        // Table Parser
+        const lines = text.split('\n');
+        let html = "";
+        let inTable = false;
+        let tableHeader = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith('|') && line.endsWith('|')) {
+                if (!inTable) {
+                    html += '<div class="table-responsive"><table class="premium-table">';
+                    inTable = true;
+                }
+                const cells = line.split('|').filter(c => c.trim() !== '' || line.indexOf('|'+c+'|') !== -1).map(c => c.trim());
+                // Skip separator rows | :--- | :--- |
+                if (cells.every(c => c.match(/^[:\s-]+$/))) continue;
+
+                html += '<tr>';
+                cells.forEach(cell => {
+                    const tag = html.includes('<thead>') ? 'td' : 'th';
+                    if (tag === 'th' && !html.includes('<thead>')) html += '<thead>';
+                    html += `<${tag}>${formatTextOnly(cell)}</${tag}>`;
+                });
+                if (html.endsWith('</th>')) html = html.replace(/<\/th>$/, '</th></thead><tbody>');
+                html += '</tr>';
+            } else {
+                if (inTable) {
+                    html += '</tbody></table></div>';
+                    inTable = false;
+                }
+                html += formatTextOnly(line) + '<br>';
+            }
+        }
+        if (inTable) html += '</tbody></table></div>';
+
+        // Downloader Logic
         const excelRegex = /\[?(?:تقرير|ملف|تحميل|)(?:رابط التحميل: )?(https?:\/\/[^\s]+?\.xlsx|\/media\/[^\s]+?\.xlsx)\]?/g;
         const pdfRegex = /\[?(?:تقرير|ملف|تحميل|)(?:رابط التحميل: )?(https?:\/\/[^\s]+?\.pdf|\/media\/[^\s]+?\.pdf)\]?/g;
-        let html = text.replace(excelRegex, (match, url) => {
+        
+        html = html.replace(excelRegex, (match, url) => {
             const filename = url.split('/').pop();
-            return `
-                <a href="${url}" class="download-card" download>
-                    <div class="card-icon excel-theme">XL</div>
-                    <div class="card-content">
-                        <div class="card-title">تقرير بيانات (Excel)</div>
-                        <div class="card-meta">${filename}</div>
-                    </div>
-                    <div style="font-weight: bold; color: #10b981; font-size: 0.8em;">تحميل</div>
-                </a>
-            `;
+            return `<a href="${url}" class="download-card" download><div class="card-icon excel-theme">XL</div><div class="card-content"><div class="card-title">تقرير بيانات (Excel)</div><div class="card-meta">${filename}</div></div><div style="font-weight: bold; color: #10b981; font-size: 0.8em;">تحميل</div></a>`;
         });
         html = html.replace(pdfRegex, (match, url) => {
             const filename = url.split('/').pop();
-            return `
-                <a href="${url}" class="download-card" download target="_blank">
-                    <div class="card-icon pdf-theme">PDF</div>
-                    <div class="card-content">
-                        <div class="card-title">تقرير طبي (PDF)</div>
-                        <div class="card-meta">${filename}</div>
-                    </div>
-                    <div style="font-weight: bold; color: #ef4444; font-size: 0.8em;">تحميل</div>
-                </a>
-            `;
+            return `<a href="${url}" class="download-card" download target="_blank"><div class="card-icon pdf-theme">PDF</div><div class="card-content"><div class="card-title">تقرير طبي (PDF)</div><div class="card-meta">${filename}</div></div><div style="font-weight: bold; color: #ef4444; font-size: 0.8em;">تحميل</div></a>`;
         });
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
         return html;
+    }
+
+    function formatTextOnly(text) {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
     }
 
     window.onload = () => { fetchHistory(); };

@@ -667,3 +667,44 @@ button#send-btn:hover {
         gap: 15px;
     }
 }
+
+/* Table Rendering */
+.table-responsive {
+    overflow-x: auto;
+    margin: 15px 0;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    background: white;
+}
+
+.premium-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    min-width: 500px;
+}
+
+.premium-table th {
+    background: #f8fafc;
+    padding: 12px 15px;
+    text-align: right;
+    font-weight: 800;
+    color: #1e293b;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.premium-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #475569;
+    vertical-align: top;
+    line-height: 1.5;
+}
+
+.premium-table tr:last-child td {
+    border-bottom: none;
+}
+
+.premium-table tr:hover td {
+    background: #f8fafc;
+}
